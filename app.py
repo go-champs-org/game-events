@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 from threading import Thread
 
 from utils.rabbit_connection import RabbitMQClient
+from tasks import process_message
 
 app = Flask(__name__)
 
@@ -11,7 +12,8 @@ def start_rabbitmq_listener():
     rabbitmq_client.connect()
 
     def callback(ch, method, properties, body):
-        print(f" [x] Received {body}")
+        print("Message received. Forwarding to Celery")
+        process_message.delay(body)
 
     rabbitmq_client.start_consuming(callback)
 
