@@ -1,30 +1,27 @@
 from flask import Flask, jsonify
-from threading import Thread
+import signal
+import sys
 
-from utils.rabbit_connection import RabbitMQClient
-from tasks import process_message
+from utils.logging_config import logger
 
 app = Flask(__name__)
 
 
-def start_rabbitmq_listener():
-    rabbitmq_client = RabbitMQClient()
-    rabbitmq_client.connect()
-
-    def callback(ch, method, properties, body):
-        print("Message received. Forwarding to Celery")
-        process_message.delay(body)
-
-    rabbitmq_client.start_consuming(callback)
-
-
+# Flask route to check status
 @app.route("/status", methods=["GET"])
 def status():
     return jsonify({"status": "Running"}), 200
 
 
+# Signal handler for graceful shutdown
+def shutdown_handler(signal, frame):
+    logger.info("Shutting down...")
+    sys.exit(0)
+
+
 if __name__ == "__main__":
-    listener_thread = Thread(target=start_rabbitmq_listener)
-    listener_thread.daemon = True
-    listener_thread.start()
+    # Handle shutdown signals to clean up RabbitMQ connection
+    signal.signal(signal.SIGINT, shutdown_handler)
+    signal.signal(signal.SIGTERM, shutdown_handler)
+
     app.run(host="0.0.0.0", port=5001)
